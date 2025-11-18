@@ -62,6 +62,8 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/saas_ocr
       REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
       SECRET_KEY: your-secret-key-change-this-in-production
       DEBUG: "True"
@@ -70,7 +72,28 @@ services:
     volumes:
       - ./backend:/app
       - ./storage:/storage
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main_v2:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker for Async Processing
+  celery_worker:
+    build: .
+    container_name: saas-ocr-celery
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/saas_ocr
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      SECRET_KEY: your-secret-key-change-this-in-production
+    volumes:
+      - ./backend:/app
+      - ./storage:/storage
+    command: celery -A celery_app worker --loglevel=info
 
 volumes:
   postgres_data:

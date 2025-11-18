@@ -65,3 +65,9 @@ httpx==0.26.0
 
 # Security
 cryptography==42.0.2
+
+# Payment Processing
+stripe==7.8.1
+
+# Additional Utilities
+python-magic-bin==0.4.14  # For Windows compatibility
