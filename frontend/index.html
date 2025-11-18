@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS OCR - Medical Document Processing</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8e9ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .options {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .option-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        select, input {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .processing {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .result-section {
+            background: #f8f9ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .result-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .result-item {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .result-value {
+            color: #333;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .confidence-high {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .confidence-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .confidence-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .json-viewer {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 SaaS OCR</h1>
+            <p>AI-Powered Medical Document Processing</p>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+            <!-- Stats will be loaded here -->
+        </div>
+
+        <div class="main-card">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">Drag & Drop your document here</div>
+                <div class="upload-hint">or click to browse (PDF, PNG, JPG, TIFF - max 50MB)</div>
+                <input type="file" id="fileInput" class="file-input" accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif">
+            </div>
+
+            <div class="options">
+                <div class="option-group">
+                    <label for="documentType">Document Type (Optional)</label>
+                    <select id="documentType">
+                        <option value="">Auto-detect</option>
+                        <option value="hospice_admission">Hospice Admission</option>
+                        <option value="medication_list">Medication List</option>
+                        <option value="physician_orders">Physician Orders</option>
+                        <option value="progress_note">Progress Note</option>
+                        <option value="h_and_p">H&P (History & Physical)</option>
+                    </select>
+                </div>
+
+                <div class="option-group">
+                    <label for="schemaTemplate">Extraction Schema</label>
+                    <select id="schemaTemplate">
+                        <option value="medical_general">Medical General</option>
+                        <option value="hospice">Hospice Specific</option>
+                        <option value="home_health">Home Health</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn" id="uploadBtn" disabled>Upload & Process</button>
+
+            <div class="processing" id="processing">
+                <div class="spinner"></div>
+                <p>Processing your document... This may take a few moments.</p>
+            </div>
+
+            <div class="error" id="error"></div>
+
+            <div class="results" id="results">
+                <h2>Extraction Results</h2>
+
+                <div class="result-section">
+                    <h3>Patient Demographics</h3>
+                    <div id="demographics"></div>
+                </div>
+
+                <div class="result-section">
+                    <h3>Medical Information</h3>
+                    <div id="medical"></div>
+                </div>
+
+                <div class="result-section">
+                    <h3>Provider Information</h3>
+                    <div id="provider"></div>
+                </div>
+
+                <div class="result-section">
+                    <h3>Raw JSON Output</h3>
+                    <pre class="json-viewer" id="jsonOutput"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let selectedFile = null;
+
+        // Load stats on page load
+        loadStats();
+
+        // Upload area interactions
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            selectedFile = file;
+            document.querySelector('.upload-text').textContent = `Selected: ${file.name}`;
+            uploadBtn.disabled = false;
+        }
+
+        uploadBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const documentType = document.getElementById('documentType').value;
+            const schemaTemplate = document.getElementById('schemaTemplate').value;
+
+            // Show processing
+            document.getElementById('processing').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            uploadBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('schema_template', schemaTemplate);
+            if (documentType) {
+                formData.append('document_type', documentType);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/jobs`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+
+                const job = await response.json();
+
+                // Hide processing
+                document.getElementById('processing').style.display = 'none';
+
+                if (job.status === 'completed') {
+                    displayResults(job);
+                    loadStats(); // Refresh stats
+                } else if (job.status === 'failed') {
+                    showError(job.error_message || 'Processing failed');
+                }
+
+                uploadBtn.disabled = false;
+
+            } catch (error) {
+                document.getElementById('processing').style.display = 'none';
+                showError(error.message);
+                uploadBtn.disabled = false;
+            }
+        });
+
+        function displayResults(job) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.style.display = 'block';
+
+            // Demographics
+            const demographics = job.extracted_data?.patient_demographics || {};
+            displaySection('demographics', demographics, job.confidence_scores);
+
+            // Medical
+            const medical = job.extracted_data?.medical_information || {};
+            displaySection('medical', medical, job.confidence_scores);
+
+            // Provider
+            const provider = job.extracted_data?.provider_information || {};
+            displaySection('provider', provider, job.confidence_scores);
+
+            // JSON
+            document.getElementById('jsonOutput').textContent = JSON.stringify(job.extracted_data, null, 2);
+        }
+
+        function displaySection(sectionId, data, confidenceScores) {
+            const section = document.getElementById(sectionId);
+            section.innerHTML = '';
+
+            if (!data || Object.keys(data).length === 0) {
+                section.innerHTML = '<p style="color: #999;">No data extracted</p>';
+                return;
+            }
+
+            for (const [key, value] of Object.entries(data)) {
+                if (value === null || value === undefined) continue;
+
+                const item = document.createElement('div');
+                item.className = 'result-item';
+
+                const label = document.createElement('div');
+                label.className = 'result-label';
+                label.textContent = formatLabel(key);
+
+                const valueDiv = document.createElement('div');
+                valueDiv.className = 'result-value';
+
+                if (Array.isArray(value)) {
+                    valueDiv.textContent = value.join(', ');
+                } else if (typeof value === 'object') {
+                    valueDiv.textContent = JSON.stringify(value);
+                } else {
+                    valueDiv.textContent = value;
+                }
+
+                // Add confidence badge
+                const confidenceKey = `${sectionId}.${key}`;
+                const confidence = confidenceScores?.[confidenceKey];
+                if (confidence !== undefined) {
+                    const badge = document.createElement('span');
+                    badge.className = `confidence-badge ${getConfidenceClass(confidence)}`;
+                    badge.textContent = `${Math.round(confidence * 100)}%`;
+                    valueDiv.appendChild(badge);
+                }
+
+                item.appendChild(label);
+                item.appendChild(valueDiv);
+                section.appendChild(item);
+            }
+        }
+
+        function formatLabel(key) {
+            return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function getConfidenceClass(confidence) {
+            if (confidence >= 0.8) return 'confidence-high';
+            if (confidence >= 0.5) return 'confidence-medium';
+            return 'confidence-low';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                if (!response.ok) return;
+
+                const stats = await response.json();
+
+                const statsGrid = document.getElementById('statsGrid');
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.api_calls_remaining.toLocaleString()}</div>
+                        <div class="stat-label">API Calls Remaining</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.api_calls_used.toLocaleString()}</div>
+                        <div class="stat-label">API Calls Used</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.completed_jobs}</div>
+                        <div class="stat-label">Documents Processed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.tier.toUpperCase()}</div>
+                        <div class="stat-label">Current Tier</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+    </script>
+</body>
+</html>
