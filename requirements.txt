@@ -71,3 +71,30 @@ stripe==7.8.1
 
 # Additional Utilities
 python-magic-bin==0.4.14  # For Windows compatibility
+
+# Document Format Support
+python-docx==1.1.0  # Word documents
+openpyxl==3.1.2  # Excel spreadsheets
+python-pptx==0.6.23  # PowerPoint presentations
+striprtf==0.0.26  # RTF documents
+beautifulsoup4==4.12.3  # HTML parsing
+lxml==5.1.0  # XML/HTML parsing
+markdown==3.5.2  # Markdown support
+textract==1.6.5  # Legacy Office formats (optional)
+
+# Cloud LLM Providers
+openai==1.12.0  # OpenAI GPT
+google-generativeai==0.3.2  # Google Gemini
+anthropic==0.18.1  # Anthropic Claude
+cohere==4.47  # Cohere
+
+# Self-hosted LLM
+torch>=2.2.0  # PyTorch for HuggingFace
+transformers>=4.37.2  # HuggingFace models
+accelerate>=0.26.1  # Model acceleration
+sentencepiece>=0.1.99  # Tokenization
+bitsandbytes>=0.42.0  # Quantization (optional)
+
+# Additional Libraries
+requests>=2.31.0  # HTTP requests for API calls
+pyyaml==6.0.1  # YAML configuration support
