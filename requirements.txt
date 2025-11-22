@@ -98,3 +98,8 @@ bitsandbytes>=0.42.0  # Quantization (optional)
 # Additional Libraries
 requests>=2.31.0  # HTTP requests for API calls
 pyyaml==6.0.1  # YAML configuration support
+
+# Extended Image Format Support (Optional)
+pillow-heif>=0.13.0  # HEIC/HEIF format support (Apple photos)
+pillow-avif-plugin>=1.4.0  # AVIF format support (next-gen compression)
+cairosvg>=2.7.1  # SVG rasterization
