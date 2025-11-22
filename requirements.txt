@@ -98,3 +98,15 @@ bitsandbytes>=0.42.0  # Quantization (optional)
 # Additional Libraries
 requests>=2.31.0  # HTTP requests for API calls
 pyyaml==6.0.1  # YAML configuration support
+langdetect==1.0.9  # Language detection for multi-language support
+
+# Layout Analysis & Table Extraction
+pdfplumber==0.10.3  # PDF table extraction
+pandas>=2.1.4  # Table data manipulation
+scikit-learn>=1.4.0  # ML utilities for layout analysis
+img2table>=1.2.3  # Advanced table extraction from images
+
+# Extended Image Format Support (Optional)
+pillow-heif>=0.13.0  # HEIC/HEIF format support (Apple photos)
+pillow-avif-plugin>=1.4.0  # AVIF format support (next-gen compression)
+cairosvg>=2.7.1  # SVG rasterization

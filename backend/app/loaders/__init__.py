@@ -60,7 +60,24 @@ class DocumentLoaderFactory:
                 **config
             )
 
-        elif ext in ['.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp', '.gif', '.webp']:
+        elif ext in [
+            # Standard formats
+            '.png', '.jpg', '.jpeg', '.bmp', '.gif',
+            # Scanned formats
+            '.tiff', '.tif',
+            # Modern formats
+            '.webp', '.heic', '.heif', '.avif',
+            # JPEG variants
+            '.jp2', '.j2k', '.jpe', '.jfif',
+            # Professional/RAW
+            '.dng', '.raw',
+            # Legacy
+            '.pcx', '.tga', '.ico',
+            # Netpbm
+            '.pbm', '.pgm', '.ppm', '.pnm',
+            # Vector (rasterized)
+            '.svg', '.eps'
+        ]:
             return ImageLoader(
                 ocr_engine=self.ocr_engine,
                 **config
@@ -149,15 +166,52 @@ class DocumentLoaderFactory:
             Dictionary mapping extensions to document type names
         """
         return {
+            # PDF
             '.pdf': 'PDF Document',
+
+            # Standard Image Formats
             '.png': 'PNG Image',
             '.jpg': 'JPEG Image',
             '.jpeg': 'JPEG Image',
-            '.tiff': 'TIFF Image',
-            '.tif': 'TIFF Image',
-            '.bmp': 'BMP Image',
+            '.bmp': 'Bitmap Image',
             '.gif': 'GIF Image',
+
+            # Scanned Document Formats
+            '.tiff': 'TIFF Image (Multi-page support)',
+            '.tif': 'TIFF Image (Multi-page support)',
+
+            # Modern Image Formats
             '.webp': 'WebP Image',
+            '.heic': 'HEIC Image (Apple)',
+            '.heif': 'HEIF Image (Apple)',
+            '.avif': 'AVIF Image (Next-gen)',
+
+            # JPEG Variants
+            '.jp2': 'JPEG 2000',
+            '.j2k': 'JPEG 2000',
+            '.jpe': 'JPEG',
+            '.jfif': 'JPEG',
+
+            # Professional/RAW Formats
+            '.dng': 'Digital Negative (Adobe RAW)',
+            '.raw': 'RAW Image',
+
+            # Legacy Image Formats
+            '.pcx': 'PC Paintbrush',
+            '.tga': 'Truevision TGA',
+            '.ico': 'Icon File',
+
+            # Netpbm Formats
+            '.pbm': 'Portable Bitmap',
+            '.pgm': 'Portable Graymap',
+            '.ppm': 'Portable Pixmap',
+            '.pnm': 'Portable Anymap',
+
+            # Vector Graphics (Rasterized)
+            '.svg': 'SVG (Scalable Vector Graphics)',
+            '.eps': 'EPS (Encapsulated PostScript)',
+
+            # Office Documents
             '.doc': 'Word Document (Legacy)',
             '.docx': 'Word Document',
             '.xls': 'Excel Spreadsheet (Legacy)',
@@ -165,12 +219,16 @@ class DocumentLoaderFactory:
             '.xlsm': 'Excel Spreadsheet (Macro-enabled)',
             '.ppt': 'PowerPoint Presentation (Legacy)',
             '.pptx': 'PowerPoint Presentation',
+
+            # Text Formats
             '.txt': 'Plain Text',
             '.rtf': 'Rich Text Format',
             '.md': 'Markdown',
             '.markdown': 'Markdown',
             '.html': 'HTML Document',
             '.htm': 'HTML Document',
+
+            # Data Formats
             '.csv': 'CSV File',
             '.json': 'JSON File',
             '.xml': 'XML File',
