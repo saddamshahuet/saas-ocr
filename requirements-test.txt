@@ -1,0 +1,61 @@
+# Testing Requirements
+# Extends requirements.txt with additional testing dependencies
+
+# Core Testing Framework
+pytest==8.0.0
+pytest-asyncio==0.23.4
+pytest-cov==4.1.0
+pytest-xdist==3.5.0  # Parallel test execution
+pytest-timeout==2.2.0  # Test timeouts
+pytest-mock==3.12.0  # Mocking utilities
+pytest-html==4.1.1  # HTML test reports
+pytest-json-report==1.5.0  # JSON test reports
+
+# E2E Testing
+playwright==1.41.2  # Browser automation
+selenium==4.17.2  # Alternative browser automation
+requests-mock==1.11.0  # HTTP mocking
+
+# Test Data Generation
+faker==22.6.0  # Fake data generation
+factory-boy==3.3.0  # Model factories
+mimesis==13.1.0  # Additional fake data
+
+# Database Testing
+pytest-postgresql==5.0.0  # PostgreSQL fixtures
+testing.postgresql==1.3.0  # Test database management
+testcontainers==3.7.1  # Docker containers for tests
+
+# API Testing
+httpx==0.26.0  # Async HTTP client
+fastapi[test]==0.109.0  # FastAPI testing utilities
+
+# Mocking & Stubbing
+responses==0.24.1  # HTTP response mocking
+freezegun==1.4.0  # Time mocking
+pytest-env==1.1.3  # Environment variable management
+
+# Coverage & Reporting
+coverage[toml]==7.4.1  # Coverage tracking
+pytest-benchmark==4.0.0  # Performance benchmarking
+allure-pytest==2.13.2  # Allure test reports
+
+# Code Quality
+pylint==3.0.3  # Static code analysis
+mypy==1.8.0  # Type checking
+black==24.1.1  # Code formatting
+isort==5.13.2  # Import sorting
+flake8==7.0.0  # Linting
+
+# Load Testing
+locust==2.20.1  # Load testing framework
+
+# Snapshot Testing
+syrupy==4.6.0  # Snapshot testing for data structures
+
+# Security Testing
+bandit==1.7.6  # Security linting
+safety==3.0.1  # Dependency vulnerability scanning
+
+# Documentation
+pytest-testdox==3.1.0  # BDD-style test output
