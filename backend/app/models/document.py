@@ -10,6 +10,7 @@ class Document(Base, TimestampMixin):
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
 
     # File information
     filename = Column(String(255), nullable=False)
@@ -27,6 +28,7 @@ class Document(Base, TimestampMixin):
 
     # Relationships
     job = relationship("Job", back_populates="documents")
+    organization = relationship("Organization", back_populates="documents")
 
     def __repr__(self):
         return f"<Document {self.filename}>"

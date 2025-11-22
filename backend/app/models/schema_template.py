@@ -10,6 +10,7 @@ class SchemaTemplate(Base, TimestampMixin):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
 
     # Template metadata
     name = Column(String(255), nullable=False)
@@ -34,6 +35,7 @@ class SchemaTemplate(Base, TimestampMixin):
 
     # Relationships
     user = relationship("User")
+    organization = relationship("Organization", back_populates="schema_templates")
 
     def __repr__(self):
         return f"<SchemaTemplate {self.name} v{self.version}>"
@@ -46,6 +48,7 @@ class Batch(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     batch_id = Column(String(100), unique=True, index=True, nullable=False)  # UUID
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
 
     # Batch metadata
     name = Column(String(255), nullable=True)
@@ -72,6 +75,7 @@ class Batch(Base, TimestampMixin):
 
     # Relationships
     user = relationship("User")
+    organization = relationship("Organization")
 
     def __repr__(self):
         return f"<Batch {self.batch_id} - {self.status}>"

@@ -10,6 +10,7 @@ class APIKey(Base, TimestampMixin):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
 
     # The key itself (hashed in production)
     key_hash = Column(String(255), unique=True, index=True, nullable=False)
@@ -28,6 +29,7 @@ class APIKey(Base, TimestampMixin):
 
     # Relationships
     user = relationship("User", back_populates="api_keys")
+    organization = relationship("Organization", back_populates="api_keys")
 
     def __repr__(self):
         return f"<APIKey {self.key_prefix}... for user {self.user_id}>"
