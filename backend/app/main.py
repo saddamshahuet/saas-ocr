@@ -15,6 +15,9 @@ from app.schemas.user import UserCreate, UserResponse, Token
 from app.schemas.job import JobCreate, JobResponse, JobListResponse
 from app.services.ocr_service import get_ocr_service
 from app.services.llm_service import get_llm_service
+from app.services.language_service import get_language_manager
+from app.services.ehr_service import EHRConnector, EHRStandard
+from app.services.review_service import get_review_queue, ReviewStatus
 
 # Configure logging
 logging.basicConfig(
@@ -308,6 +311,393 @@ async def list_jobs(
         "page": page,
         "page_size": page_size,
         "total_pages": total_pages,
+    }
+
+
+# ==================== Language Detection Endpoint ====================
+
+@app.post("/api/v1/detect-language")
+async def detect_language(text: str = Form(...)):
+    """
+    Detect language from text
+
+    Args:
+        text: Text to analyze for language detection
+
+    Returns:
+        Detected languages with confidence scores
+    """
+    try:
+        language_manager = get_language_manager()
+
+        # Detect languages
+        detected = language_manager.detect_language(text, top_n=3)
+
+        # Get additional info for top language
+        if detected:
+            top_lang = detected[0]['lang']
+            config = language_manager.auto_detect_and_configure(text)
+
+            return {
+                "detected_languages": detected,
+                "primary_language": {
+                    "code": config['detected_language'],
+                    "name": config['language_name'],
+                    "confidence": config['confidence'],
+                    "ocr_language": config['ocr_language'],
+                    "supported": config['supported']
+                },
+                "all_supported_languages": [
+                    {"code": code, "name": cfg.name}
+                    for code, cfg in language_manager.get_all_supported_languages().items()
+                ]
+            }
+        else:
+            return {
+                "detected_languages": [],
+                "primary_language": None,
+                "error": "Unable to detect language"
+            }
+
+    except Exception as e:
+        logger.error(f"Language detection failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Language detection failed: {str(e)}")
+
+
+# ==================== EHR Export Endpoints ====================
+
+@app.post("/api/v1/jobs/{job_id}/export/hl7")
+async def export_to_hl7(
+    job_id: str,
+    patient_id: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Export job results to HL7 v2 format
+
+    Args:
+        job_id: Job ID
+        patient_id: Patient ID for HL7 message
+
+    Returns:
+        HL7 v2 message
+    """
+    # Get job
+    job = db.query(Job).filter(Job.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail="Job not completed yet")
+
+    if not job.extracted_data:
+        raise HTTPException(status_code=400, detail="No extracted data available")
+
+    try:
+        # Create EHR connector
+        connector = EHRConnector(ehr_standard=EHRStandard.HL7_V2)
+
+        # Convert to HL7
+        hl7_message = connector.convert_extracted_data_to_hl7(
+            extracted_data=job.extracted_data,
+            patient_id=patient_id
+        )
+
+        return {
+            "success": True,
+            "format": "HL7 v2",
+            "message": hl7_message.to_string()
+        }
+
+    except Exception as e:
+        logger.error(f"HL7 export failed: {e}")
+        raise HTTPException(status_code=500, detail=f"HL7 export failed: {str(e)}")
+
+
+@app.post("/api/v1/jobs/{job_id}/export/fhir")
+async def export_to_fhir(
+    job_id: str,
+    patient_id: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Export job results to FHIR R4 format
+
+    Args:
+        job_id: Job ID
+        patient_id: Patient ID for FHIR resources
+
+    Returns:
+        FHIR Bundle resource
+    """
+    # Get job
+    job = db.query(Job).filter(Job.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail="Job not completed yet")
+
+    if not job.extracted_data:
+        raise HTTPException(status_code=400, detail="No extracted data available")
+
+    try:
+        # Create EHR connector
+        connector = EHRConnector(ehr_standard=EHRStandard.FHIR_R4)
+
+        # Convert to FHIR
+        fhir_bundle = connector.convert_extracted_data_to_fhir(
+            extracted_data=job.extracted_data,
+            patient_id=patient_id,
+            document_id=job_id
+        )
+
+        return {
+            "success": True,
+            "format": "FHIR R4",
+            "bundle": fhir_bundle
+        }
+
+    except Exception as e:
+        logger.error(f"FHIR export failed: {e}")
+        raise HTTPException(status_code=500, detail=f"FHIR export failed: {str(e)}")
+
+
+@app.post("/api/v1/jobs/{job_id}/send-to-ehr")
+async def send_to_ehr(
+    job_id: str,
+    patient_id: str = Form(...),
+    ehr_endpoint: str = Form(...),
+    ehr_format: str = Form("fhir"),  # "hl7" or "fhir"
+    api_key: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Send job results directly to EHR system
+
+    Args:
+        job_id: Job ID
+        patient_id: Patient ID
+        ehr_endpoint: EHR API endpoint URL
+        ehr_format: EHR format ("hl7" or "fhir")
+        api_key: Optional API key for authentication
+
+    Returns:
+        Result of sending to EHR
+    """
+    # Get job
+    job = db.query(Job).filter(Job.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail="Job not completed yet")
+
+    if not job.extracted_data:
+        raise HTTPException(status_code=400, detail="No extracted data available")
+
+    try:
+        # Determine EHR standard
+        if ehr_format.lower() == "hl7":
+            ehr_standard = EHRStandard.HL7_V2
+        elif ehr_format.lower() == "fhir":
+            ehr_standard = EHRStandard.FHIR_R4
+        else:
+            raise ValueError(f"Unsupported EHR format: {ehr_format}")
+
+        # Create EHR connector
+        connector = EHRConnector(
+            ehr_standard=ehr_standard,
+            endpoint_url=ehr_endpoint,
+            api_key=api_key
+        )
+
+        # Convert data
+        if ehr_standard == EHRStandard.HL7_V2:
+            data = connector.convert_extracted_data_to_hl7(
+                extracted_data=job.extracted_data,
+                patient_id=patient_id
+            )
+        else:
+            data = connector.convert_extracted_data_to_fhir(
+                extracted_data=job.extracted_data,
+                patient_id=patient_id,
+                document_id=job_id
+            )
+
+        # Send to EHR
+        result = connector.send_to_ehr(data)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to send to EHR: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send to EHR: {str(e)}")
+
+
+# ==================== Review Queue Endpoints (Human-in-Loop) ====================
+
+@app.get("/api/v1/review/queue")
+async def get_review_items(limit: int = 10):
+    """Get pending review items"""
+    try:
+        review_queue = get_review_queue()
+        items = review_queue.get_pending_items(limit=limit)
+
+        return {
+            "success": True,
+            "items": [item.to_dict() for item in items],
+            "count": len(items)
+        }
+    except Exception as e:
+        logger.error(f"Failed to get review items: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/review/{item_id}/approve")
+async def approve_review_item(
+    item_id: str,
+    suggested_value: str = Form(None),
+    notes: str = Form("")
+):
+    """Approve a review item"""
+    try:
+        review_queue = get_review_queue()
+        item = review_queue.get_item(item_id)
+
+        if not item:
+            raise HTTPException(status_code=404, detail="Review item not found")
+
+        # Use suggested value if provided, otherwise use extracted value
+        final_value = suggested_value if suggested_value else item.extracted_value
+
+        success = review_queue.update_item(
+            item_id=item_id,
+            suggested_value=final_value,
+            reviewer_notes=notes,
+            status=ReviewStatus.APPROVED
+        )
+
+        return {"success": success, "message": "Item approved"}
+
+    except Exception as e:
+        logger.error(f"Failed to approve review item: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/review/{item_id}/reject")
+async def reject_review_item(
+    item_id: str,
+    notes: str = Form(...)
+):
+    """Reject a review item"""
+    try:
+        review_queue = get_review_queue()
+
+        success = review_queue.update_item(
+            item_id=item_id,
+            suggested_value=None,
+            reviewer_notes=notes,
+            status=ReviewStatus.REJECTED
+        )
+
+        return {"success": success, "message": "Item rejected"}
+
+    except Exception as e:
+        logger.error(f"Failed to reject review item: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/review/stats")
+async def get_review_stats():
+    """Get review queue statistics"""
+    try:
+        review_queue = get_review_queue()
+        stats = review_queue.get_statistics()
+
+        return {"success": True, "stats": stats}
+
+    except Exception as e:
+        logger.error(f"Failed to get review stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Mobile App APIs ====================
+
+@app.post("/api/mobile/v1/jobs")
+async def mobile_create_job(
+    file: UploadFile = File(...),
+    document_type: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Mobile-optimized job creation endpoint
+    Simplified response for mobile apps
+    """
+    # Reuse existing job creation logic
+    job = await create_job(
+        file=file,
+        document_type=document_type,
+        schema_template="medical_general",
+        webhook_url=None,
+        db=db
+    )
+
+    # Return simplified response for mobile
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "message": "Document uploaded successfully"
+    }
+
+
+@app.get("/api/mobile/v1/jobs/{job_id}")
+async def mobile_get_job(job_id: str, db: Session = Depends(get_db)):
+    """
+    Mobile-optimized job status endpoint
+    Returns simplified status information
+    """
+    job = db.query(Job).filter(Job.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Simplified response for mobile
+    response = {
+        "job_id": job.job_id,
+        "status": job.status,
+        "progress": int((job.pages_processed / job.total_pages * 100) if job.total_pages else 0)
+    }
+
+    # Include results if completed
+    if job.status == "completed":
+        response["results"] = {
+            "patient_name": job.extracted_data.get("patient_name") if job.extracted_data else None,
+            "confidence": sum(job.confidence_scores.values()) / len(job.confidence_scores) if job.confidence_scores else 0
+        }
+
+    return response
+
+
+@app.get("/api/mobile/v1/recent-jobs")
+async def mobile_recent_jobs(limit: int = 5, db: Session = Depends(get_db)):
+    """Get recent jobs for mobile app"""
+    user = db.query(User).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    jobs = db.query(Job).filter(Job.user_id == user.id).order_by(
+        Job.created_at.desc()
+    ).limit(limit).all()
+
+    return {
+        "jobs": [
+            {
+                "job_id": job.job_id,
+                "status": job.status,
+                "created_at": job.created_at.isoformat() if job.created_at else None
+            }
+            for job in jobs
+        ]
     }
 
 

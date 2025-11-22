@@ -32,6 +32,18 @@ class ProcessingConfig:
     ocr_preprocess: bool = True
     ocr_dpi: int = 300
 
+    # Language support
+    auto_detect_language: bool = True  # Automatically detect document language
+    supported_languages: List[str] = field(default_factory=lambda: ["en", "es", "fr", "de", "zh", "ja", "ar"])
+    use_multilingual_prompts: bool = True  # Use language-specific LLM prompts
+
+    # Layout understanding
+    enable_layout_analysis: bool = True  # Enable document layout analysis
+    extract_tables: bool = True  # Extract tables from documents
+    use_layoutlm: bool = False  # Use LayoutLMv3 for advanced layout understanding
+    detect_forms: bool = True  # Detect form fields
+    classify_sections: bool = True  # Classify document sections
+
     # LLM provider config
     llm_provider: str = "ollama"  # huggingface, ollama, openai, gemini, etc.
     llm_model: str = "llama2"
@@ -108,6 +120,8 @@ class DocumentProcessor:
         self.ocr_engine = None
         self.llm_provider = None
         self.document_loader_factory = None
+        self.language_manager = None
+        self.layout_analyzer = None
 
         self._initialize_components()
 
@@ -125,6 +139,23 @@ class DocumentProcessor:
 
         # Initialize LLM provider
         self._initialize_llm()
+
+        # Initialize language manager
+        if self.config.auto_detect_language:
+            from ..services.language_service import get_language_manager
+            self.language_manager = get_language_manager()
+            logger.info("Language manager initialized")
+
+        # Initialize layout analyzer
+        if self.config.enable_layout_analysis:
+            from ..services.layout_service import get_layout_analyzer
+            self.layout_analyzer = get_layout_analyzer(
+                use_layoutlm=self.config.use_layoutlm,
+                extract_tables=self.config.extract_tables,
+                detect_forms=self.config.detect_forms,
+                classify_sections=self.config.classify_sections
+            )
+            logger.info("Layout analyzer initialized")
 
         logger.info("Document processor initialized successfully")
 
@@ -224,25 +255,48 @@ class DocumentProcessor:
                 file_path, file_content, file_extension
             )
 
-            # Step 2: Extract data using LLM
+            # Step 2: Analyze layout if enabled
+            layout_result = None
+            if self.config.enable_layout_analysis and self.layout_analyzer:
+                logger.info("Analyzing document layout...")
+                layout_result = self._analyze_layout(loaded_doc, file_path)
+
+            # Step 3: Extract data using LLM
             logger.info("Extracting structured data...")
             extraction_result = self._extract_data(
                 loaded_doc,
                 extraction_schema
             )
 
-            # Step 3: Build result
+            # Step 4: Build result
             processing_time = time.time() - start_time
+
+            # Build metadata
+            metadata = {
+                "llm_provider": extraction_result.provider_type,
+                "llm_model": extraction_result.model_used,
+                "tokens_used": extraction_result.tokens_used,
+                "llm_processing_time": extraction_result.processing_time
+            }
+
+            # Add layout information if available
+            if layout_result:
+                metadata["layout_analysis"] = {
+                    "num_tables": len(layout_result.tables),
+                    "num_elements": len(layout_result.elements),
+                    "num_sections": len(layout_result.sections),
+                    "columns_detected": layout_result.columns_detected,
+                    "num_columns": layout_result.num_columns,
+                    "page_layout": layout_result.page_layout,
+                    "tables": [table.to_dict() for table in layout_result.tables],
+                    "elements": [elem.to_dict() for elem in layout_result.elements[:10]],  # Limit to first 10
+                    "sections": layout_result.sections
+                }
 
             result = ProcessingResult(
                 extracted_data=extraction_result.extracted_data,
                 confidence_scores=extraction_result.confidence_scores,
-                metadata={
-                    "llm_provider": extraction_result.provider_type,
-                    "llm_model": extraction_result.model_used,
-                    "tokens_used": extraction_result.tokens_used,
-                    "llm_processing_time": extraction_result.processing_time
-                },
+                metadata=metadata,
                 processing_time=processing_time,
                 document_info=loaded_doc.to_dict(),
                 chunks_processed=self._get_chunks_info(loaded_doc),
@@ -287,6 +341,51 @@ class DocumentProcessor:
             loader_config=loader_config
         )
 
+    def _analyze_layout(self, loaded_doc, file_path: Optional[str]):
+        """
+        Analyze document layout
+
+        Args:
+            loaded_doc: Loaded document object
+            file_path: Optional file path
+
+        Returns:
+            LayoutAnalysisResult or None
+        """
+        if not self.layout_analyzer:
+            return None
+
+        try:
+            # For PDF files, analyze layout
+            if file_path and file_path.lower().endswith('.pdf'):
+                layout_result = self.layout_analyzer.analyze_layout(
+                    file_path=file_path,
+                    page_number=1  # Analyze first page
+                )
+                return layout_result
+
+            # For image files, convert loaded doc data if available
+            elif loaded_doc.raw_data:
+                try:
+                    from PIL import Image
+                    import io
+
+                    image = Image.open(io.BytesIO(loaded_doc.raw_data))
+                    layout_result = self.layout_analyzer.analyze_layout(
+                        image=image,
+                        page_number=1
+                    )
+                    return layout_result
+                except Exception as e:
+                    logger.warning(f"Could not analyze layout from image: {e}")
+                    return None
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Layout analysis failed: {e}")
+            return None
+
     def _extract_data(self, loaded_doc, extraction_schema):
         """Extract structured data from loaded document"""
         if not self.llm_provider:
@@ -318,9 +417,28 @@ class DocumentProcessor:
 
     def _extract_from_full_document(self, loaded_doc, extraction_schema):
         """Extract from full document content"""
+        # Detect language and build prompt if multilingual support is enabled
+        detected_language = 'en'
+        prompt_template = None
+
+        if self.config.auto_detect_language and self.language_manager and self.config.use_multilingual_prompts:
+            lang_info = self.language_manager.auto_detect_and_configure(loaded_doc.content)
+            detected_language = lang_info['detected_language']
+
+            # Build multilingual prompt
+            prompt_template = self.language_manager.get_multilingual_prompt(
+                text=loaded_doc.content,
+                schema=extraction_schema,
+                detected_language=detected_language
+            )
+
+            logger.info(f"Detected language: {lang_info['language_name']} ({detected_language}) "
+                       f"with confidence {lang_info['confidence']:.2%}")
+
         return self.llm_provider.extract_structured_data(
             text=loaded_doc.content,
-            schema=extraction_schema
+            schema=extraction_schema,
+            prompt_template=prompt_template
         )
 
     def _extract_from_chunks(self, loaded_doc, extraction_schema):
@@ -328,6 +446,13 @@ class DocumentProcessor:
         if not loaded_doc.chunks:
             # No chunks, process full document
             return self._extract_from_full_document(loaded_doc, extraction_schema)
+
+        # Detect language once from full content if enabled
+        detected_language = 'en'
+        if self.config.auto_detect_language and self.language_manager:
+            lang_info = self.language_manager.auto_detect_and_configure(loaded_doc.content)
+            detected_language = lang_info['detected_language']
+            logger.info(f"Detected language for chunks: {lang_info['language_name']} ({detected_language})")
 
         # Limit chunks if configured
         chunks_to_process = loaded_doc.chunks
@@ -338,9 +463,19 @@ class DocumentProcessor:
         chunk_results = []
         for chunk in chunks_to_process:
             try:
+                # Build multilingual prompt for this chunk if enabled
+                prompt_template = None
+                if self.config.use_multilingual_prompts and self.language_manager:
+                    prompt_template = self.language_manager.get_multilingual_prompt(
+                        text=chunk.content,
+                        schema=extraction_schema,
+                        detected_language=detected_language
+                    )
+
                 result = self.llm_provider.extract_structured_data(
                     text=chunk.content,
-                    schema=extraction_schema
+                    schema=extraction_schema,
+                    prompt_template=prompt_template
                 )
                 chunk_results.append(result)
             except Exception as e:
