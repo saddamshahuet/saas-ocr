@@ -11,6 +11,8 @@ class Job(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(String(100), unique=True, index=True, nullable=False)  # UUID
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Job status: pending, processing, completed, failed
     status = Column(String(50), default="pending", nullable=False, index=True)
@@ -39,6 +41,8 @@ class Job(Base, TimestampMixin):
 
     # Relationships
     user = relationship("User", back_populates="jobs")
+    organization = relationship("Organization", back_populates="jobs")
+    workspace = relationship("Workspace", back_populates="jobs")
     documents = relationship("Document", back_populates="job", cascade="all, delete-orphan")
 
     def __repr__(self):
