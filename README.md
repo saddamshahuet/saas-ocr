@@ -44,3 +44,109 @@ Currently, the client is considering using the Google Gemini API for document pr
 
 ## Goal
 Produce a **comprehensive feasibility study and business model plan** covering technical model selection, hosting provider comparison, and financial viability for an AI-powered OCR and data extraction service in the hospice and palliative care sector.
+
+---
+
+## 🚀 Quick Start - Deployment
+
+### One-Command Deployment
+
+Deploy the complete SaaS OCR platform with a single command:
+
+```bash
+./deploy.sh
+```
+
+This will:
+- ✅ Create all database tables and schema
+- ✅ Generate 60 organizations (Enterprise, Pro, Starter tiers)
+- ✅ Create 750+ users with realistic roles
+- ✅ Generate 75,000+ OCR jobs representing 2.5 years of usage
+- ✅ Create 150,000+ audit log entries (HIPAA compliant)
+- ✅ Set up complete RBAC system (36 permissions, 12 roles)
+- ✅ **Ready for production in 5-10 minutes!**
+
+### Prerequisites
+
+```bash
+# 1. Start required services
+docker-compose up -d postgres redis minio
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your settings
+
+# 3. Run deployment
+./deploy.sh
+```
+
+### Deployment Options
+
+```bash
+# Full deployment with seed data (default)
+./deploy.sh --full
+
+# Fresh start (WARNING: deletes existing data)
+./deploy.sh --fresh
+
+# Schema only (no seed data)
+./deploy.sh --schema-only
+```
+
+### Access the Platform
+
+After deployment:
+
+```bash
+# Start the application
+docker-compose up -d
+
+# Access API documentation
+open http://localhost:8000/docs
+```
+
+**Login Credentials:**
+- Email: `admin@saasocr.com`
+- Password: `Password123!`
+
+### 📖 Detailed Documentation
+
+For comprehensive deployment information, troubleshooting, and production setup:
+
+**[📚 Read DEPLOYMENT.md](./DEPLOYMENT.md)**
+
+Includes:
+- Complete seed data details (organizations, users, jobs, etc.)
+- Database management and queries
+- Backup and restore procedures
+- Production deployment checklist
+- Troubleshooting guide
+- Post-deployment configuration
+
+---
+
+## Architecture Overview
+
+### Database Schema
+
+The platform uses PostgreSQL with the following core tables:
+- **Organizations** - Multi-tenant organization management
+- **Users** - User accounts with email/password authentication
+- **Workspaces** - Team organization within organizations
+- **Jobs** - OCR processing jobs
+- **Documents** - Uploaded document files
+- **Schema Templates** - Custom extraction schemas
+- **API Keys** - API authentication
+- **Audit Logs** - HIPAA-compliant audit trail
+- **RBAC** - Roles, Permissions, and access control
+
+### Tech Stack
+
+- **Backend**: FastAPI (Python 3.11+)
+- **Database**: PostgreSQL 15+
+- **Cache**: Redis
+- **Storage**: MinIO (S3-compatible)
+- **Task Queue**: Celery
+- **OCR**: Tesseract + Azure Document Intelligence
+- **LLM**: OpenAI GPT-4 / Anthropic Claude
+- **Deployment**: Docker + Docker Compose
